@@ -1,0 +1,64 @@
+name: Build Extension
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+      create_release:
+        description: 'Create GitHub Release'
+        required: true
+        default: false
+        type: boolean
+      description:
+        description: 'Release description (only used if creating a release)'
+        required: false
+        default: 'New release'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Create ZIP archive
+        run: |
+          cd dist
+          zip -r augment-refill-${{ github.event.inputs.version }}.zip build/
+
+      - name: Upload extension as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: augment-refill-${{ github.event.inputs.version }}
+          path: dist/augment-refill-${{ github.event.inputs.version }}.zip
+          retention-days: 90
+
+      - name: Create Release
+        if: ${{ github.event.inputs.create_release == 'true' }}
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: Release v${{ github.event.inputs.version }}
+          body: ${{ github.event.inputs.description }}
+          draft: false
+          prerelease: false
+          files: |
+            dist/augment-refill-${{ github.event.inputs.version }}.zip
